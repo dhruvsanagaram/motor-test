@@ -3,9 +3,16 @@
 #define QUAD_ENCODER_A 27
 #define QUAD_ENCODER_B 26
 
-#define MOTOR_ENA 32
-#define MOTOR_IN1 16
-#define MOTOR_IN2 17
+
+// #define MOTOR_ENA 32
+// #define MOTOR_IN1 16
+// #define MOTOR_IN2 17
+
+#define BR_MOTOR_IN1 32
+#define BR_MOTOR_IN2 16
+
+#define BL_MOTOR_IN3 17
+#define BL_MOTOR_IN4 18
 
 volatile int position = 0; // Encoder position
 volatile int direction = 0; // 1 for clockwise, -1 for counterclockwise
@@ -14,6 +21,8 @@ int speed = 0;
 const int pwmChannel = 0;
 const int pwmFrequency = 5000;
 const int pwmResolution = 12;
+
+const int pwmChannel_2 = 0;
 
 void updateEncoder() {
   int a = digitalRead(QUAD_ENCODER_A);
@@ -32,8 +41,11 @@ void updateEncoder() {
 void setMotor(int speed, int dir){
   ledcWrite(pwmChannel, abs(speed));
 
-  digitalWrite(MOTOR_IN1, HIGH);
-  digitalWrite(MOTOR_IN2, LOW);
+  digitalWrite(BR_MOTOR_IN2, HIGH);
+  // digitalWrite(MOTOR_IN2, LOW);
+
+  ledcWrite(pwmChannel_2, abs(speed));
+  digitalWrite(BL_MOTOR_IN4, HIGH);
 }
 
 void setup() {
@@ -44,9 +56,13 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(QUAD_ENCODER_B), updateEncoder, CHANGE);
 
   ledcSetup(pwmChannel, pwmFrequency, pwmResolution);
-  ledcAttachPin(MOTOR_ENA, pwmChannel);
-  pinMode(MOTOR_IN1, OUTPUT);
-  pinMode(MOTOR_IN2, OUTPUT);
+  ledcAttachPin(BR_MOTOR_IN1, pwmChannel);
+  pinMode(BR_MOTOR_IN2, OUTPUT);
+  // pinMode(MOTOR_IN2, OUTPUT);
+
+  ledcSetup(pwmChannel_2, pwmFrequency, pwmResolution);
+  ledcAttachPin(BL_MOTOR_IN3, pwmChannel_2);
+  pinMode(BL_MOTOR_IN4, OUTPUT);
 
   setMotor(0,0);
 }
