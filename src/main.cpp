@@ -24,13 +24,15 @@ const int pwmResolution = 12;
 
 const int pwmChannel_2 = 0;
 
-void updateEncoder() {
+int targetDistance = 1000;    // Target distance in encoder counts
+// int maxSpeed = 4095;          // Maximum PWM value (12-bit resolution)
+int maxSpeed = 3000;
+int accelerationStep = 50;    // Incremental speed step for acceleration and deceleration
+int delayPerStep = 10;        // Delay per step during acceleration and deceleration (ms)
+
+void IRAM_ATTR updateEncoder() {
   int a = digitalRead(QUAD_ENCODER_A);
   int b = digitalRead(QUAD_ENCODER_B);
-
-
-  // if (a == HIGH && b == LOW) direction = 1; // Clockwise
-  // else if (a == LOW && b == HIGH) direction = -1; // Counterclockwise
 
   if(a == HIGH && b == LOW){
     position += 1;
@@ -68,32 +70,92 @@ void setup() {
 }
 
 void loop() {
-  int maxSpeed = 4095;        // Max PWM value for 8-bit resolution
-  int steps = 30;            // Number of steps to vary speed
-  int delayPerStep = 500;    // Delay per step (500ms = 0.5s per step)
-  int increment = maxSpeed / steps; // Incremental change in speed
+  // int maxSpeed = 4095;        // Max PWM value for 8-bit resolution
+  // int steps = 30;            // Number of steps to vary speed
+  // int delayPerStep = 500;    // Delay per step (500ms = 0.5s per step)
+  // int increment = maxSpeed / steps; // Incremental change in speed
 
-  for (int i = 0; i <= steps; i++) {
-    speed = i * increment;
-    setMotor(speed, 1); // Forward direction
-    delay(delayPerStep);
-  }
+  // for (int i = 0; i <= steps; i++) {
+  //   Serial.print('.');
+  //   speed = i * increment;
+  //   setMotor(speed, 1); // Forward direction
+  //   delay(delayPerStep);
+  // }
 
-  for (int i = steps; i >= 0; i--) {
-    speed = i * increment;
-    setMotor(speed, 1);
-    // Serial.print("Decreasing Speed: ");
+  // Serial.print("\nIncreasing Speed Position: ");
+  // Serial.println(position);
+  // Serial.print("Direction: ");
+  // Serial.println(direction);
+  // Serial.println();
+  // delay(500);
+
+  // for (int i = steps; i >= 0; i--) {
+  //   Serial.print('.');
+  //   speed = i * increment;
+  //   setMotor(speed, 1);
+  //   delay(delayPerStep);
+  // }
+
+
+  // Serial.print("\nDecreasing Speed Position: ");
+  // Serial.println(position);
+  // Serial.print("Direction: ");
+  // Serial.println(direction);
+  // Serial.println();
+  // delay(500);
+
+
+  ///////////////////////////////////////////////////////////
+
+  // Move forward to the target distance
+  int speed = 0;
+  position = 0; // Reset encoder position to start tracking movement
+  Serial.println("Moving forward...");
+  while (position < targetDistance) { // Accelerate until reaching the target distance
+    // Serial.println('aldkjfaljasdlkdjfasldkjffa');
+    speed = map(position, 0, targetDistance, accelerationStep, maxSpeed); // Gradually increase speed
     // Serial.println(speed);
+    setMotor(speed, 1); // Set motor speed and forward direction
+    delay(delayPerStep); // Delay for smooth acceleration
+    Serial.println(speed);
+    Serial.println(position);
+  }
+
+  // Decelerate smoothly to a stop
+  Serial.println("Decelerating to stop...");
+  while (speed > 0) { // Gradually reduce speed to 0
+    speed -= accelerationStep;
+    if (speed < 0) speed = 0; // Ensure speed does not go below 0
+    setMotor(speed, 1); // Update motor speed
     delay(delayPerStep);
   }
 
-  // setMotor(2500, 1);
+  // Stop the motor for a moment
+  setMotor(0, 1);
+  delay(1000); // Pause before restarting the cycle
 
-  Serial.print("Position: ");
-  Serial.println(position);
-  Serial.print("Direction: ");
-  Serial.println(direction);
-  delay(500);
+  // Accelerate back to full speed and repeat the movement
+  Serial.println("Starting again...");
+  speed = 0;
+  position = 0; // Reset encoder position again
+  while (position < targetDistance) { // Accelerate until reaching the target distance
+    speed = map(position, 0, targetDistance, accelerationStep, maxSpeed); // Gradually increase speed
+    setMotor(speed, 1);
+    delay(delayPerStep);
+  }
+
+  // Decelerate smoothly to stop again
+  Serial.println("Decelerating to stop...");
+  while (speed > 0) {
+    speed -= accelerationStep;
+    if (speed < 0) speed = 0; // Ensure speed does not go below 0
+    setMotor(speed, 1);
+    delay(delayPerStep);
+  }
+
+  // Pause before restarting the loop
+  setMotor(0, 1);
+  delay(1000); // Delay before the next cycle
 }
 
 
