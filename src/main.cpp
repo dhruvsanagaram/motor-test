@@ -121,7 +121,7 @@ void loop() {
 
   if (!SerialBT.connected()) {
     Serial.println("Attempting to connect to Makerfabs-Anchor...");
-    if (SerialBT.connect("Makerfabs-Anchor")) {
+    if (SerialBT.connect("Makerfabs-Tag")) {
         Serial.println("Successfully connected to Makerfabs-Anchor!");
     } else {
         Serial.println("Failed to connect to Makerfabs-Anchor.");
