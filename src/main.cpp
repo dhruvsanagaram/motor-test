@@ -21,12 +21,14 @@
 #define LIN_DEACTUATE 23
 
 #define TEMP_PIN 33
-#define PH_PIN 25
-#define MOISTURE_PIN 4
+#define PH_PIN 4
+#define MOISTURE_PIN 25
 #define ADC_RESOLUTION 4095.0
 #define VOLTAGE_REF 3.3
 #define ATLAS_COEFF -5.6548
 #define ATLAS_CONST 15.509
+#define MOISTURE_COEFF 1102033.43
+#define MOISTURE_Y 1089774.62
 
 volatile int position = 0; // Encoder position
 volatile int bl_position = 0; 
@@ -169,31 +171,31 @@ void setup() {
     }
   }
 
-  // if(SPIFFS.exists("/pH.txt")){
-  //   Serial.println("File exists. Preparing data for BLE transmission:");
-  //   File file = SPIFFS.open("/pH.txt", FILE_READ);
+  if(SPIFFS.exists("/pH.txt")){
+    Serial.println("File exists. Preparing data for BLE transmission:");
+    File file = SPIFFS.open("/pH.txt", FILE_READ);
 
-  //   if(file){
-  //     SPIFFS.remove("/pH.txt");
-  //     Serial.println("Previous pH.txt deleted");
-  //   }
-  //   else{
-  //     Serial.println("Failed to open pH.txt for reading.");
-  //   }
-  // }
+    if(file){
+      SPIFFS.remove("/pH.txt");
+      Serial.println("Previous pH.txt deleted");
+    }
+    else{
+      Serial.println("Failed to open pH.txt for reading.");
+    }
+  }
 
-  // if(SPIFFS.exists("/moistures.txt")){
-  //   Serial.println("File exists. Preparing data for BLE transmission:");
-  //   File file = SPIFFS.open("/moistures.txt", FILE_READ);
+  if(SPIFFS.exists("/moistures.txt")){
+    Serial.println("File exists. Preparing data for BLE transmission:");
+    File file = SPIFFS.open("/moistures.txt", FILE_READ);
 
-  //   if(file){
-  //     SPIFFS.remove("/moistures.txt");
-  //     Serial.println("Previous moistures.txt deleted");
-  //   }
-  //   else{
-  //     Serial.println("Failed to open moistures.txt for reading.");
-  //   }
-  // }
+    if(file){
+      SPIFFS.remove("/moistures.txt");
+      Serial.println("Previous moistures.txt deleted");
+    }
+    else{
+      Serial.println("Failed to open moistures.txt for reading.");
+    }
+  }
 }
 
 void loop() {
@@ -221,43 +223,44 @@ void loop() {
       Serial.println("End of temperature file contents.");
     }
 
-    // File pHFile = SPIFFS.open("/pH.txt", FILE_READ);
-    // if(pHFile){
-    //   while(pHFile.available())
-    //   {
-    //     String pHLine = pHFile.readStringUntil('\n');
-    //     pHLine = pHLine + "\n";
-    //     Serial.println(pHLine);
-    //   }
-    //   pHFile.close();
-    //   Serial.println("End of pH file contents.");
-    // }
+    File pHFile = SPIFFS.open("/pH.txt", FILE_READ);
+    if(pHFile){
+      while(pHFile.available())
+      {
+        String pHLine = pHFile.readStringUntil('\n');
+        pHLine = pHLine + "\n";
+        Serial.println(pHLine);
+      }
+      pHFile.close();
+      Serial.println("End of pH file contents.");
+    }
 
-    // File moisturesFile = SPIFFS.open("/moistures.txt", FILE_READ);
-    // if(moisturesFile){
-    //   while(moisturesFile.available())
-    //   {
-    //     String moisturesLine = moisturesFile.readStringUntil('\n');
-    //     moisturesLine = moisturesLine + "\n";
-    //     Serial.println(moisturesLine);
-    //   }
-    //   moisturesFile.close();
-    //   Serial.println("End of moisture file contents.");
-    // }
+    File moisturesFile = SPIFFS.open("/moistures.txt", FILE_READ);
+    if(moisturesFile){
+      while(moisturesFile.available())
+      {
+        String moisturesLine = moisturesFile.readStringUntil('\n');
+        moisturesLine = moisturesLine + "\n";
+        Serial.println(moisturesLine);
+      }
+      moisturesFile.close();
+      Serial.println("End of moisture file contents.");
+    }
 
     delay(10000);
   }
-  else if ((coord1+coord2)/2 < sqrt(height_left*height_left+alen*alen) + 0.2) {
+  else if (stops_done < waypoints && (coord1+coord2)/2 < sqrt(height_left*height_left+alen*alen) + 0.2) {
     delay(1000);
     digitalWrite(LIN_ACTUATE, HIGH);
     digitalWrite(LIN_DEACTUATE, LOW);
     Serial.println("Linear Actuator Extended");
 
     int temperature = analogRead(TEMP_PIN);
-    // int pH = analogRead(PH_PIN);
-    // float pH_voltage = (pH_voltage / ADC_RESOLUTION) * VOLTAGE_REF;
-    // float pH_actual = (ATLAS_COEFF * pH_voltage) + ATLAS_CONST;
-    // int moisture = analogRead(MOISTURE_PIN);
+    int pH = analogRead(PH_PIN);
+    float pH_voltage = (pH / ADC_RESOLUTION) * VOLTAGE_REF;
+    float pH_actual = (ATLAS_COEFF * pH_voltage) + ATLAS_CONST;
+    int moisture = analogRead(MOISTURE_PIN);
+    // float moisture_actual = MOISTURE_COEFF * moisture + MOISTURE_Y;
 
     File tempFile = SPIFFS.open("/temperatures.txt", FILE_APPEND);
     if (tempFile) {
@@ -268,23 +271,30 @@ void loop() {
         Serial.println("Failed to open temperatures.txt for writing");
     }
 
-    // File pHFile = SPIFFS.open("/pH.txt", FILE_APPEND);
-    // if (pHFile) {
-    //     pHFile.println(String(pH_actual));
-    //     pHFile.close();
-    //     Serial.println("PH saved to SPIFFS");
-    // } else {
-    //     Serial.println("Failed to open pH.txt for writing");
-    // }
+    File pHFile = SPIFFS.open("/pH.txt", FILE_APPEND);
+    if (pHFile) {
+        pHFile.println(String(pH_actual));
+        pHFile.close();
+        Serial.println("PH saved to SPIFFS");
+    } else {
+        Serial.println("Failed to open pH.txt for writing");
+    }
 
-    // File moisturesFile = SPIFFS.open("/moistures.txt", FILE_APPEND);
-    // if (moisturesFile) {
-    //     moisturesFile.println(String(moisture));
-    //     moisturesFile.close();
-    //     Serial.println("PH saved to SPIFFS");
-    // } else {
-    //     Serial.println("Failed to open pH.txt for writing");
-    // }
+    //10ko 0.739
+    //100 k0 0.998
+    //330 k0 1.69
+    //1 m0 2.55
+    //2 m0 2.9
+    //3 m0 2.9
+
+    File moisturesFile = SPIFFS.open("/moistures.txt", FILE_APPEND);
+    if (moisturesFile) {
+        moisturesFile.println(String(moisture));
+        moisturesFile.close();
+        Serial.println("Moisture saved to SPIFFS");
+    } else {
+        Serial.println("Failed to open moistures.txt for writing");
+    }
     
     delay(10000);
     digitalWrite(LIN_ACTUATE, LOW);
@@ -302,7 +312,7 @@ void loop() {
     bl_speed = speed;
     setMotor(speed, bl_speed, 1);
     Serial.println("Going straight");
-    delay(1000);
+    delay(700);
   }
   else if (coord1 > coord2 + 0.15) {
     bl_speed = 0;
@@ -314,14 +324,14 @@ void loop() {
     bl_speed = speed;
     setMotor(speed, bl_speed, 1);
     Serial.println("Going straight");
-    delay(1000);
+    delay(700);
   }
   else {
     speed = 80;
     bl_speed = speed;
     setMotor(speed, bl_speed, 1);
     Serial.println("Going straight");
-    delay(1000);
+    delay(700);
   }
 
   int analogValue = analogRead(ADC_PIN);
