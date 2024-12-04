@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <BluetoothSerial.h>
+#include <SPIFFS.h>
 
 #define QUAD_ENCODER_A 27
 #define QUAD_ENCODER_B 26
@@ -18,6 +19,14 @@
 
 #define LIN_ACTUATE 22
 #define LIN_DEACTUATE 23
+
+#define TEMP_PIN 33
+#define PH_PIN 25
+#define MOISTURE_PIN 4
+#define ADC_RESOLUTION 4095.0
+#define VOLTAGE_REF 3.3
+#define ATLAS_COEFF -5.6548
+#define ATLAS_CONST 15.509
 
 volatile int position = 0; // Encoder position
 volatile int bl_position = 0; 
@@ -140,24 +149,56 @@ void setup() {
 
   digitalWrite(LIN_ACTUATE, LOW);
   digitalWrite(LIN_DEACTUATE, LOW);
+
+  if(!SPIFFS.begin(true)){
+    Serial.println("Failed to initialize SPIFFS");
+    return;
+  }
+  Serial.println("SPIFFS initialized successfully");
+
+  if(SPIFFS.exists("/temperatures.txt")){
+    Serial.println("File exists. Preparing data for BLE transmission:");
+    File file = SPIFFS.open("/temperatures.txt", FILE_READ);
+
+    if(file){
+      SPIFFS.remove("/temperatures.txt");
+      Serial.println("Previous temperatures.txt deleted");
+    }
+    else{
+      Serial.println("Failed to open temperatures.txt for reading.");\
+    }
+  }
+
+  // if(SPIFFS.exists("/pH.txt")){
+  //   Serial.println("File exists. Preparing data for BLE transmission:");
+  //   File file = SPIFFS.open("/pH.txt", FILE_READ);
+
+  //   if(file){
+  //     SPIFFS.remove("/pH.txt");
+  //     Serial.println("Previous pH.txt deleted");
+  //   }
+  //   else{
+  //     Serial.println("Failed to open pH.txt for reading.");
+  //   }
+  // }
+
+  // if(SPIFFS.exists("/moistures.txt")){
+  //   Serial.println("File exists. Preparing data for BLE transmission:");
+  //   File file = SPIFFS.open("/moistures.txt", FILE_READ);
+
+  //   if(file){
+  //     SPIFFS.remove("/moistures.txt");
+  //     Serial.println("Previous moistures.txt deleted");
+  //   }
+  //   else{
+  //     Serial.println("Failed to open moistures.txt for reading.");
+  //   }
+  // }
 }
 
 void loop() {
   speed = 0;
   bl_speed = 0;
-  // position = 0;
-  // bl_position = 0;
-
-  // speed = 100;
-  // bl_speed = 0;
-  // setMotor(speed, bl_speed, 1);
-  // delay(5000);
-
-  // speed = 0;
-  // bl_speed = speed;
-  // setMotor(speed, bl_speed, 1);
-  // delay(5000);
-
   speed = 0;
   bl_speed = speed;
   setMotor(speed, bl_speed, 1);
@@ -165,6 +206,45 @@ void loop() {
   int remaining = waypoints - stops_done;
   int height_left = increment*remaining;
   if (coord1+coord2 < 1.8) {
+
+    Serial.println("Printing sensor file contents:");
+
+    File tempFile = SPIFFS.open("/temperatures.txt", FILE_READ);
+    if(tempFile){
+      while(tempFile.available())
+      {
+        String tempLine = tempFile.readStringUntil('\n');
+        tempLine = tempLine + "\n";
+        Serial.println(tempLine);
+      }
+      tempFile.close();
+      Serial.println("End of temperature file contents.");
+    }
+
+    // File pHFile = SPIFFS.open("/pH.txt", FILE_READ);
+    // if(pHFile){
+    //   while(pHFile.available())
+    //   {
+    //     String pHLine = pHFile.readStringUntil('\n');
+    //     pHLine = pHLine + "\n";
+    //     Serial.println(pHLine);
+    //   }
+    //   pHFile.close();
+    //   Serial.println("End of pH file contents.");
+    // }
+
+    // File moisturesFile = SPIFFS.open("/moistures.txt", FILE_READ);
+    // if(moisturesFile){
+    //   while(moisturesFile.available())
+    //   {
+    //     String moisturesLine = moisturesFile.readStringUntil('\n');
+    //     moisturesLine = moisturesLine + "\n";
+    //     Serial.println(moisturesLine);
+    //   }
+    //   moisturesFile.close();
+    //   Serial.println("End of moisture file contents.");
+    // }
+
     delay(10000);
   }
   else if ((coord1+coord2)/2 < sqrt(height_left*height_left+alen*alen) + 0.2) {
@@ -172,6 +252,40 @@ void loop() {
     digitalWrite(LIN_ACTUATE, HIGH);
     digitalWrite(LIN_DEACTUATE, LOW);
     Serial.println("Linear Actuator Extended");
+
+    int temperature = analogRead(TEMP_PIN);
+    // int pH = analogRead(PH_PIN);
+    // float pH_voltage = (pH_voltage / ADC_RESOLUTION) * VOLTAGE_REF;
+    // float pH_actual = (ATLAS_COEFF * pH_voltage) + ATLAS_CONST;
+    // int moisture = analogRead(MOISTURE_PIN);
+
+    File tempFile = SPIFFS.open("/temperatures.txt", FILE_APPEND);
+    if (tempFile) {
+        tempFile.println(String(temperature));
+        tempFile.close();
+        Serial.println("Temperature saved to SPIFFS");
+    } else {
+        Serial.println("Failed to open temperatures.txt for writing");
+    }
+
+    // File pHFile = SPIFFS.open("/pH.txt", FILE_APPEND);
+    // if (pHFile) {
+    //     pHFile.println(String(pH_actual));
+    //     pHFile.close();
+    //     Serial.println("PH saved to SPIFFS");
+    // } else {
+    //     Serial.println("Failed to open pH.txt for writing");
+    // }
+
+    // File moisturesFile = SPIFFS.open("/moistures.txt", FILE_APPEND);
+    // if (moisturesFile) {
+    //     moisturesFile.println(String(moisture));
+    //     moisturesFile.close();
+    //     Serial.println("PH saved to SPIFFS");
+    // } else {
+    //     Serial.println("Failed to open pH.txt for writing");
+    // }
+    
     delay(10000);
     digitalWrite(LIN_ACTUATE, LOW);
     digitalWrite(LIN_DEACTUATE, HIGH);
@@ -180,7 +294,7 @@ void loop() {
   }
   else if (coord2 > coord1 + 0.15) {
     speed = 0;
-    bl_speed = 100;
+    bl_speed = 80;
     setMotor(speed, bl_speed, 1);
     Serial.println("Turning left");
     delay(200);
@@ -188,11 +302,11 @@ void loop() {
     bl_speed = speed;
     setMotor(speed, bl_speed, 1);
     Serial.println("Going straight");
-    delay(2000);
+    delay(1000);
   }
   else if (coord1 > coord2 + 0.15) {
     bl_speed = 0;
-    speed = 100;
+    speed = 80;
     setMotor(speed, bl_speed, 1);
     Serial.println("Turning right");
     delay(200);
@@ -200,67 +314,15 @@ void loop() {
     bl_speed = speed;
     setMotor(speed, bl_speed, 1);
     Serial.println("Going straight");
-    delay(2000);
+    delay(1000);
   }
   else {
     speed = 80;
     bl_speed = speed;
     setMotor(speed, bl_speed, 1);
     Serial.println("Going straight");
-    delay(2000);
+    delay(1000);
   }
-
-  // Serial.println("Moving forward...");
-  // while (position < targetDistance) {
-  //   speed = map(position, 0, targetDistance, accelerationStep, maxSpeed); // Gradually increase speed
-  //   bl_speed = speed;
-  //   setMotor(speed, bl_speed, 1);
-  //   delay(delayPerStep);
-  //   // Serial.println(speed);
-  //   Serial.print("Position: ");
-  //   Serial.println(position);
-  //   Serial.print("BL Position: ");
-  //   Serial.println(bl_position);
-  // }
-
-  // Serial.println("Decelerating to stop...");
-  // while (speed > 0) {
-  //   speed -= accelerationStep;
-  //   bl_speed -= accelerationStep;
-  //   if (speed < 0) speed = 0;
-  //   setMotor(speed, bl_speed, 1);
-  //   delay(delayPerStep);
-  // }
-
-  // setMotor(0, 0, 1);
-  // delay(1000);
-
-  // Serial.println("Starting again...");
-  // speed = 0;
-  // bl_speed = 0;
-  // position = 0;
-  // bl_position = 0;
-  // while (position < targetDistance) {
-  //   speed = map(position, 0, targetDistance, accelerationStep, maxSpeed);
-  //   bl_speed = speed;
-  //   setMotor(speed, bl_speed, 1);
-  //   delay(delayPerStep);
-  // }
-
-  // Serial.println("Decelerating to stop...");
-  // while (speed > 0) {
-  //   speed -= accelerationStep;
-  //   bl_speed -= accelerationStep;
-  //   if (speed < 0) speed = 0;
-  //   setMotor(speed, bl_speed, 1);
-  //   delay(delayPerStep);
-  // }
-
-  // setMotor(0, 0, 1);
-  // delay(1000);
-
-
-  //////////////////////////
 
   int analogValue = analogRead(ADC_PIN);
   int analogValue2 = analogRead(ADC_PIN2);
@@ -275,36 +337,6 @@ void loop() {
   // Print the received value for debugging
   Serial.println("Received value 1: " + String(coord1));
   Serial.println("Received value 2: " + String(coord2));
-
-  // if (!SerialBT.connected()) {
-  //   Serial.println("Attempting to connect to Makerfabs-Anchor...");
-  //   if (SerialBT.connect("Makerfabs-Tag")) {
-  //       Serial.println("Successfully connected to Makerfabs-Anchor!");
-  //   } else {
-  //       Serial.println("Failed to connect to Makerfabs-Anchor.");
-  //   }
-  // }
-
-  // if (SerialBT.available()) {
-  //   String receivedData = SerialBT.readStringUntil('\n'); // Read incoming data
-
-  //   // Parse the distance if needed and use it in your application logic
-  //   Serial.print("Parsed Distance String: ");
-  //   Serial.println(receivedData);
-  //   SerialBT.println("ACK");
-  //   delay(1000);
-  //   // if (receivedData.startsWith("Distance: ")) {
-  //   //   Serial.print("Parsed Distance String: ");
-  //   //   Serial.println(receivedData);
-  //   //   // float distance = receivedData.substring(10).toFloat();
-  //   //   // Serial.print("Parsed Distance: ");
-  //   //   // Serial.println(distance);
-
-  //   //   // SerialBT.println("ACK");
-  //   //   // You can use this distance to adjust motor behavior
-  //   //   // delay(500);
-  //   // }
-  // }
 }
 
 
