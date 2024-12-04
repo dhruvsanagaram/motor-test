@@ -13,13 +13,13 @@
 #define BL_MOTOR_IN3 17
 #define BL_MOTOR_IN4 18
 
-#define ADC_PIN 2
-#define ADC_PIN2 15
+#define ADC_PIN 13
+#define ADC_PIN2 14
 
 volatile int position = 0; // Encoder position
 volatile int bl_position = 0; 
 volatile int direction = 0; // 1 for clockwise, -1 for counterclockwise
-int speed = 0;
+
 const int pwmChannel = 0;
 const int pwmFrequency = 5000;
 const int pwmResolution = 12;
@@ -30,6 +30,17 @@ int maxSpeed = 100;
 // int accelerationStep = 100;    // Incremental speed step for acceleration and deceleration
 int accelerationStep = 10;
 int delayPerStep = 10;        // Delay per step during acceleration and deceleration (ms)
+
+int stops_done = 0;
+
+int waypoints = 4;
+
+float alen = 0.75;
+
+uint8_t speed;
+uint8_t bl_speed;
+
+float increment;
 
 volatile float coord1;
 volatile float coord2;
@@ -53,7 +64,9 @@ void IRAM_ATTR updateEncoder() {
 }
 
 
-void setMotor(int speed, int bl_speed, int dir){
+void setMotor(uint8_t speed, uint8_t bl_speed, uint8_t dir){
+  Serial.println(speed);
+  Serial.println(bl_speed);
   if(speed == 0){
     ledcWrite(pwmChannel, 0);
     digitalWrite(BR_MOTOR_IN1, LOW);
@@ -62,6 +75,7 @@ void setMotor(int speed, int bl_speed, int dir){
   else{
     ledcWrite(pwmChannel, abs(speed));
     digitalWrite(BR_MOTOR_IN2, HIGH);
+    // digitalWrite(BR_MOTOR_IN2, LOW);
   }
 
   if(bl_speed == 0){
@@ -72,6 +86,7 @@ void setMotor(int speed, int bl_speed, int dir){
   else{
     ledcWrite(pwmChannel_2, abs(bl_speed));
     digitalWrite(BL_MOTOR_IN4, HIGH);
+    // digitalWrite(BL_MOTOR_IN4, LOW);
   }
 }
 
@@ -102,23 +117,82 @@ void setup() {
   pinMode(BL_MOTOR_IN4, OUTPUT);
 
   setMotor(0,0,0);
+
+  int analogValue = analogRead(ADC_PIN);
+  int analogValue2 = analogRead(ADC_PIN2);
+
+  int receivedValue = map(analogValue, 0, 4095, 0, 255);
+  int receivedValue2 = map(analogValue2, 0, 4095, 0, 255);
+
+  coord1 = receivedValue/255.0 * 5.0;
+  coord2 = receivedValue2/255.0 * 5.0;
+
+  float clen = (coord1+coord2)/2;
+  float blen = sqrt(clen*clen-alen*alen);
+  increment = blen/waypoints;
+  // Serial.println(mid_clen);
 }
 
 void loop() {
-  int speed = 0;
-  int bl_speed = 0;
+  speed = 0;
+  bl_speed = 0;
   // position = 0;
   // bl_position = 0;
+
+  // speed = 100;
+  // bl_speed = 0;
+  // setMotor(speed, bl_speed, 1);
+  // delay(5000);
+
+  // speed = 0;
+  // bl_speed = speed;
+  // setMotor(speed, bl_speed, 1);
+  // delay(5000);
 
   speed = 0;
   bl_speed = speed;
   setMotor(speed, bl_speed, 1);
-  delay(10000);
-
-  speed = 100;
-  bl_speed = speed;
-  setMotor(speed, bl_speed, 1);
-  delay(10000);
+  delay(1000);
+  int remaining = waypoints - stops_done;
+  int height_left = increment*remaining;
+  if ((coord1+coord2)/2 < sqrt(height_left*height_left+alen*alen) + 0.2) {
+    delay(10000);
+    stops_done++;
+  }
+  else if (coord1+coord2 < 1.8) {
+    delay(10000);
+  }
+  else if (coord2 > coord1 + 0.15) {
+    speed = 0;
+    bl_speed = 100;
+    setMotor(speed, bl_speed, 1);
+    Serial.println("Turning left");
+    delay(200);
+    speed = 80;
+    bl_speed = speed;
+    setMotor(speed, bl_speed, 1);
+    Serial.println("Going straight");
+    delay(2000);
+  }
+  else if (coord1 > coord2 + 0.15) {
+    bl_speed = 0;
+    speed = 100;
+    setMotor(speed, bl_speed, 1);
+    Serial.println("Turning right");
+    delay(200);
+    speed = 80;
+    bl_speed = speed;
+    setMotor(speed, bl_speed, 1);
+    Serial.println("Going straight");
+    delay(2000);
+  }
+  else {
+    speed = 80;
+    bl_speed = speed;
+    setMotor(speed, bl_speed, 1);
+    Serial.println("Going straight");
+    delay(2000);
+  }
 
   // Serial.println("Moving forward...");
   // while (position < targetDistance) {
