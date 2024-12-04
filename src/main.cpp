@@ -16,6 +16,9 @@
 #define ADC_PIN 13
 #define ADC_PIN2 14
 
+#define LIN_ACTUATE 22
+#define LIN_DEACTUATE 23
+
 volatile int position = 0; // Encoder position
 volatile int bl_position = 0; 
 volatile int direction = 0; // 1 for clockwise, -1 for counterclockwise
@@ -131,6 +134,12 @@ void setup() {
   float blen = sqrt(clen*clen-alen*alen);
   increment = blen/waypoints;
   // Serial.println(mid_clen);
+
+  pinMode(LIN_ACTUATE, OUTPUT);
+  pinMode(LIN_DEACTUATE, OUTPUT);
+
+  digitalWrite(LIN_ACTUATE, LOW);
+  digitalWrite(LIN_DEACTUATE, LOW);
 }
 
 void loop() {
@@ -155,12 +164,19 @@ void loop() {
   delay(1000);
   int remaining = waypoints - stops_done;
   int height_left = increment*remaining;
-  if ((coord1+coord2)/2 < sqrt(height_left*height_left+alen*alen) + 0.2) {
+  if (coord1+coord2 < 1.8) {
     delay(10000);
-    stops_done++;
   }
-  else if (coord1+coord2 < 1.8) {
+  else if ((coord1+coord2)/2 < sqrt(height_left*height_left+alen*alen) + 0.2) {
+    delay(1000);
+    digitalWrite(LIN_ACTUATE, HIGH);
+    digitalWrite(LIN_DEACTUATE, LOW);
+    Serial.println("Linear Actuator Extended");
     delay(10000);
+    digitalWrite(LIN_ACTUATE, LOW);
+    digitalWrite(LIN_DEACTUATE, HIGH);
+    Serial.println("Linear Actuator Retracted");
+    stops_done++;
   }
   else if (coord2 > coord1 + 0.15) {
     speed = 0;
